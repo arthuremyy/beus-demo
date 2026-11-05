@@ -93,17 +93,17 @@ verifie("30 jours : le mois",
         "mois" in medals.evalue(etat(jours_communs=jours(30))), True)
 
 # ── Distance (jamais affichée, seulement décidée) ────────────────────────────
-verifie("même point : 0 m", round(medals.distance_m(45.76, 4.83, 45.76, 4.83)), 0)
+verifie("même point : 0 m", round(medals.distance_m(48.85, 2.35, 48.85, 2.35)), 0)
 # Un degré de latitude vaut ~111 320 m : on encadre le seuil au mètre près.
-d_98 = medals.distance_m(45.7600, 4.8300, 45.76 + 0.00088, 4.8300)
-d_102 = medals.distance_m(45.7600, 4.8300, 45.76 + 0.00092, 4.8300)
+d_98 = medals.distance_m(48.8500, 2.3500, 48.85 + 0.00088, 2.3500)
+d_102 = medals.distance_m(48.8500, 2.3500, 48.85 + 0.00092, 2.3500)
 verifie("98 m : dans le seuil", d_98 <= medals.RAYON_COTE_A_COTE_M, True)
 verifie("102 m : hors seuil", d_102 <= medals.RAYON_COTE_A_COTE_M, False)
 verifie("500 m : hors seuil",
-        medals.distance_m(45.7600, 4.8300, 45.7645, 4.8300) <= medals.RAYON_COTE_A_COTE_M,
+        medals.distance_m(48.8500, 2.3500, 48.8545, 2.3500) <= medals.RAYON_COTE_A_COTE_M,
         False)
 verifie("position manquante : jamais côte à côte",
-        medals.distance_m(None, 4.83, 45.76, 4.83) == float("inf"), True)
+        medals.distance_m(None, 2.35, 48.85, 2.35) == float("inf"), True)
 
 # ── Avancement affiché ───────────────────────────────────────────────────────
 av = medals.avancement(etat(jours=jours(7)))

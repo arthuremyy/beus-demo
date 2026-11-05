@@ -21,3 +21,6 @@ docker run -d --name beus-demo --env-file .env -v "$PWD/data:/data" -p 127.0.0.1
 ```bash
 cd backend && python3 test_jour.py && python3 test_reveal.py && python3 test_medals.py && python3 test_serie.py
 ```
+
+`tests/` contient les parcours navigateur (Playwright, jsdom) et `ops/seed_dev.py` des souvenirs de test.
+Fonctionnement et choix de sécurité : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
