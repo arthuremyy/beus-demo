@@ -1,0 +1,802 @@
+/* ============================================================================
+   BeUs — « Deux encres »
+
+   Deux encres, et c'est tout : le rose (Sam) et l'or (Alex), posés en aplats
+   francs. Là où les deux se superposent naît une troisième couleur, la
+   surimpression. Elle dit une seule chose : « ça, vous l'avez fait à deux ».
+
+       rose  = Sam        or    = Alex        surimpression = les deux
+
+   Les personnes ne s'écrivent JAMAIS --rose / --or dans les règles : toujours
+   --encre-sam / --encre-alex (ou --encre-auteur). Inverser les encres des
+   deux comptes se fait alors en deux lignes, ici, et nulle part ailleurs.
+
+   LA COULEUR DÉSIGNE UNE PERSONNE, jamais un bouton ni un état. Nom, avatar,
+   marqueur : oui. Bouton principal, onglet actif, pastille « non lu »,
+   erreur, action destructive : non — l'interface est en craie et en brun, et
+   le danger a son propre rouge (--alerte), qui n'est l'encre de personne.
+
+   Ce qui est BANNI ici, et qu'il ne faut pas réintroduire :
+     · backdrop-filter / verre dépoli (*)      · dégradés de fond
+     · box-shadow coloré diffus (« lueur »)    · halos pulsés
+     · border-radius 100px sur tout (*)        · ombres portées molles (*)
+     · petites CAPITALES ESPACÉES en surtitre  · bordure de couleur à gauche
+       (le tic n°1 des interfaces générées)      des cartes et des photos
+     · valeurs en px en dur hors de :root, sauf dimensions d'objet (avatar,
+       marqueur, sceau) — tout le reste passe par un token
+
+   Écriture : phrases en casse normale, partout (boutons compris), écrites
+   avec leur majuscule à la source. Fraunces n'existe qu'à deux endroits — le
+   logo et les numéros de jour ; tout le reste en Archivo, sur l'échelle --t-*.
+
+   Règle de tri : un effet ne reste que s'il sert la LECTURE. Le flou d'un
+   souvenir verrouillé est fabriqué au serveur, jamais en CSS.
+
+   (*) Exceptions, et seulement celles-ci :
+     · la barre du bas est en verre (« liquid glass » d'iOS 26), en capsule.
+       Pas de réfraction : backdrop-filter: url(#svg) ne rend que sous
+       Chromium. Ne pas étendre le verre au reste de l'interface.
+     · objets physiques ronds : le déclencheur de l'appareil photo, et les
+       visages (avatars, initiales des marqueurs). Le cercle reste réservé à
+       ce qui représente une personne ou un objet réel.
+   ========================================================================== */
+:root{
+  /* encres */
+  --encre:#14100d;         /* fond */
+  --encre-haut:#1e1815;    /* surface posée sur le fond */
+  --encre-bas:#0d0a08;     /* creux, barre du bas */
+  --craie:#f6f0e6;         /* texte */
+  --craie-faible:#a1968a;  /* texte secondaire */
+  --craie-pale:#6b6158;    /* filets qu'on doit voir (≥ 3:1 sur le fond) */
+  --trait:#332a24;         /* filets de structure */
+  --or:#ffd23f;
+  --rose:#ff4d9d;
+  --surimpr:#ff8a4c;       /* là où les deux se rencontrent */
+  --alerte:#e5484d;        /* erreur, action destructive — l'encre de personne */
+
+  /* qui porte quelle encre : la SEULE correspondance personne → couleur */
+  --encre-sam:var(--rose);
+  --encre-alex:var(--or);
+
+  /* l'encre « courante » : chaque bloc la redéfinit selon son auteur */
+  --encre-auteur:var(--encre-sam);
+
+  --voile:rgba(13,10,8,.66);
+  --voile-fort:rgba(13,10,8,.82);
+
+  --e1:4px; --e2:8px; --e3:12px; --e4:16px; --e6:24px; --e8:32px; --e12:48px;
+
+  /* rayons : deux valeurs, pas plus. Le cercle est RÉSERVÉ aux visages. */
+  --r:2px; --r2:6px;
+
+  /* l'échelle du texte, en rem : elle suit la taille de texte d'iOS
+     (html { font: -apple-system-body } vaut 17 px par défaut) */
+  --t-petit:.647rem;   /* 11 — libellés de la barre du bas */
+  --t-meta:.765rem;    /* 13 — heures, lieux, texte secondaire */
+  --t-corps:.882rem;   /* 15 — texte courant, boutons */
+  --t-fort:1rem;       /* 17 — légendes, titres de section */
+  --t-grand:1.294rem;  /* 22 — titre d'un état, d'une feuille */
+  --t-titre:1.647rem;  /* 28 — titre d'écran */
+  --t-jour:2rem;       /* 34 — numéro de jour (Fraunces) */
+  --t-saisie:max(16px,.941rem); /* jamais sous 16 px : iOS zoomerait le champ */
+
+  --h-btn:48px;        /* bouton */
+  --h-btn-petit:36px;  /* bouton compact (envoi d'un mot, bascule) */
+  --h-champ:44px;      /* champ de saisie */
+  --cible:44px;        /* zone de toucher minimale */
+  --col:440px;         /* colonne de contenu centrée */
+
+  --disp:"Fraunces",Georgia,"Times New Roman",serif;
+  --ui:"Archivo",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --navh:60px;             /* hauteur de la capsule de la barre du bas */
+  --nav-marge:max(calc(var(--bas) - 10px), 12px);
+  --navpied:calc(var(--navh) + var(--nav-marge));
+  --haut:env(safe-area-inset-top,0px);
+  --bas:env(safe-area-inset-bottom,0px);
+}
+html{font-size:17px;touch-action:manipulation}
+@supports (font:-apple-system-body){html{font:-apple-system-body}}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* ⚠ garde-fou : sans !important, n'importe quel display: plus loin dans le
+   fichier rendait [hidden] inopérant. C'est arrivé deux fois. */
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--ui);font-size:var(--t-corps);line-height:1.35;background:var(--encre);color:var(--craie);
+  -webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none;position:fixed;inset:0;
+  font-variant-numeric:tabular-nums}
+button,input,textarea{font-family:inherit;color:inherit;font-size:inherit;line-height:inherit}
+button{background:none;border:none;cursor:pointer}
+h1,h2,h3{font-weight:inherit;font-size:inherit}
+::selection{background:var(--craie);color:var(--encre)}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--craie);outline-offset:2px}
+.disp{font-family:var(--disp);font-optical-sizing:auto;font-variation-settings:"SOFT" 0,"WONK" 1}
+svg{flex:none}
+.ic{display:inline-flex}
+.ic svg,svg.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ===== carte plein écran ================================================= */
+#map{position:fixed;inset:0;z-index:0;opacity:0;transition:opacity .6s ease}
+#map.ready{opacity:1}
+#map canvas{outline:none}
+#fallback{display:none;position:fixed;inset:0;z-index:0;background:var(--encre)}
+body.nomap #fallback{display:block}
+
+/* Crédit Esri/Mapzen : obligatoire, donc il reste — réduit à une ligne muette. */
+.maplibregl-ctrl-bottom-right{bottom:calc(var(--navpied) + 2px);right:var(--e2)}
+.maplibregl-ctrl-attrib{opacity:.3;background:transparent!important;
+  font-size:8.5px;color:var(--craie-faible);border-radius:0;padding:0 var(--e1);pointer-events:none}
+.maplibregl-ctrl-attrib a{color:var(--craie-faible)!important;text-decoration:none}
+.maplibregl-ctrl-attrib-button{display:none!important}
+
+/* ===== marqueurs =========================================================
+   Ancrés en bas : la POINTE touche la coordonnée. L'échelle suit le zoom.
+   ⚠ jamais de transform sur .mk : MapLibre y écrit sa position. */
+.mk{cursor:pointer}
+.mk-in{display:flex;flex-direction:column;align-items:center;
+  transform:scale(var(--mks,1));transform-origin:bottom center;transition:transform .18s ease-out}
+.mk.sam{--encre-auteur:var(--encre-sam)}
+.mk.alex{--encre-auteur:var(--encre-alex)}
+.mk.deux{--encre-auteur:var(--surimpr)}
+.mk-bubble{width:52px;height:52px;overflow:hidden;position:relative;border-radius:var(--r2);
+  border:2px solid var(--encre-auteur);background:var(--encre-haut)}
+.mk-bubble img{width:100%;height:100%;object-fit:cover;display:block}
+.mk-stem{width:2px;height:10px;background:var(--encre-auteur)}
+.mk-dot{width:6px;height:6px;border-radius:var(--r);background:var(--encre-auteur);
+  outline:2px solid var(--encre)}
+/* l'initiale de l'auteur : la couleur seule ne suffit pas à dire qui */
+.mk-ini{position:absolute;right:-7px;top:-7px;width:20px;height:20px;border-radius:50%;
+  background:var(--encre-auteur);color:var(--encre);font-size:var(--t-petit);font-weight:600;
+  display:flex;align-items:center;justify-content:center;outline:2px solid var(--encre)}
+.mk-in{position:relative}
+.mk-ini.photo{background:var(--encre-auteur);padding:2px}
+.mk-ini.photo img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+.mk-cadre{position:relative}
+/* pile : le décalage de repérage d'une presse mal calée, pas une ombre */
+.mk.cluster .mk-bubble{box-shadow:4px 4px 0 -1px var(--encre-auteur),4px 4px 0 0 var(--encre)}
+.mk-bubble .count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:var(--t-fort);font-weight:600;color:var(--craie);background:rgba(13,10,8,.45)}
+.mk.sel .mk-bubble{outline:2px solid var(--craie);outline-offset:2px}
+/* verrouillé : la vignette floutée + un cadenas, jamais un cadenas sur du vide */
+.mk.mystery .mk-bubble{border-style:dashed}
+.mk.mystery .mk-bubble img{opacity:.85}
+.mk-cadenas{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--craie)}
+.mk-cadenas svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+
+/* ===== coquille ==========================================================
+   ⚠ .view ne doit PAS avaler les gestes de la carte : chaque vue est
+   transparente aux pointeurs, seuls ses enfants réels les reçoivent. */
+#app{position:fixed;inset:0;z-index:3;pointer-events:none}
+.view{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden;pointer-events:none}
+.view.active{display:flex}
+.view>*{pointer-events:auto}
+#view-login,#view-capture,#view-review,#view-feed,#view-admin,#view-profile,#view-settings{background:var(--encre)}
+#view-login.active,#view-capture.active{pointer-events:auto}
+.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
+/* transitions : un écran poussé arrive de la droite, un onglet en fondu */
+.view.entre-pousse{animation:entrePousse .24s ease-out}
+.view.entre-onglet{animation:entreOnglet .16s ease-out}
+@keyframes entrePousse{from{transform:translateX(28px);opacity:.3}to{transform:none;opacity:1}}
+@keyframes entreOnglet{from{opacity:.4}to{opacity:1}}
+
+/* ===== en-têtes : trois variantes, et seulement trois =====================
+   · onglet (.topbar)   grand titre à gauche, avatar à droite
+   · poussé (.barre)    chevron à gauche, titre centré, action éventuelle à droite
+   · modal  (.barre)    ✕ à gauche, titre centré — plein écran, perte possible */
+.topbar{padding:calc(var(--haut) + var(--e3)) var(--e4) var(--e3);display:flex;
+  align-items:center;justify-content:space-between;gap:var(--e3);background:var(--encre)}
+.titre{font-size:var(--t-titre);font-weight:600;line-height:1.1;letter-spacing:-.01em}
+.sous-titre{font-size:var(--t-meta);color:var(--craie-faible);margin-top:2px;min-height:1em}
+.sous-titre:empty{display:none}
+.barre{padding:calc(var(--haut) + var(--e2)) var(--e2) var(--e2);display:grid;
+  grid-template-columns:var(--cible) 1fr var(--cible);align-items:center;gap:var(--e2);background:var(--encre)}
+.barre .titre{font-size:var(--t-fort);text-align:center;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.barre-vide{width:var(--cible)}
+
+.moi-btn{width:36px;height:36px;border-radius:50%;overflow:hidden;flex:none;
+  background:var(--encre-haut);border:2px solid var(--encre-auteur);padding:0;
+  display:flex;align-items:center;justify-content:center;font-size:var(--t-meta);font-weight:600;
+  position:relative}
+/* zone de toucher de 44 px autour d'un avatar de 36 */
+.moi-btn::after{content:"";position:absolute;inset:-4px}
+.moi-btn img{width:100%;height:100%;object-fit:cover;display:block}
+.ico-btn{width:var(--cible);height:var(--cible);border-radius:var(--r2);
+  display:flex;align-items:center;justify-content:center;color:var(--craie)}
+.ico-btn:active{background:var(--encre-haut)}
+/* sur une photo ou la caméra : un carré de voile, même gabarit */
+.ico-btn.sur-image{width:40px;height:40px;background:var(--voile)}
+.ico-btn.sur-image:active{background:var(--voile-fort)}
+
+/* Carte : bord à bord, deux boutons posés dans le coin, rien d'autre. */
+.map-coins{position:absolute;top:calc(var(--haut) + var(--e3));right:var(--e4);
+  display:flex;gap:var(--e2);align-items:center}
+.map-coins .ico-btn{width:40px;height:40px;background:var(--encre);border:1px solid var(--trait)}
+.map-coins .ico-btn svg{width:18px;height:18px}
+
+/* Bandeau de carte : une phrase, en bas, qui mène à l'action. */
+#map-hud{position:fixed;left:0;right:0;bottom:calc(var(--navpied) + var(--e3));z-index:4;
+  display:flex;justify-content:center;pointer-events:none;padding:0 var(--e4)}
+#map-hud .hud{pointer-events:auto;background:var(--encre);border:1px solid var(--trait);
+  border-radius:var(--r2);min-height:var(--cible);padding:0 var(--e3) 0 var(--e4);font-size:var(--t-corps);
+  display:flex;align-items:center;gap:var(--e2);max-width:100%;text-align:left}
+#map-hud .hud svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.6}
+#map-hud .hud.appel{background:var(--craie);color:var(--encre);border-color:var(--craie);font-weight:500}
+#map-hud .hud:active{transform:scale(.98)}
+body:has(#feuille:not([hidden])) #map-hud{display:none}
+
+/* La carte n'a pas pu se charger : un état en place, pas un écran noir. */
+#map-erreur{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  padding:var(--e6);padding-bottom:var(--navpied)}
+
+/* ===== barre du bas ======================================================
+   Une capsule de verre qui flotte au-dessus du contenu (voir l'exception de
+   la charte, en tête). Deux onglets et, au centre, le déclencheur.
+   ⚠ Safari : -webkit-backdrop-filter n'accepte pas var(), valeurs en dur. */
+#nav{position:fixed;z-index:6;bottom:var(--nav-marge);left:var(--e4);right:var(--e4);
+  max-width:400px;margin:0 auto;height:var(--navh);padding:4px;gap:4px;
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch;
+  border-radius:999px;isolation:isolate;
+  background:rgba(20,16,13,.16);
+  -webkit-backdrop-filter:blur(7px) saturate(200%) brightness(.92);
+  backdrop-filter:blur(7px) saturate(200%) brightness(.92);
+  box-shadow:inset 0 1.5px 1px -.5px rgba(255,255,255,.55),
+    inset 0 -1px 1px rgba(255,255,255,.18),
+    inset 0 0 18px rgba(255,255,255,.07),
+    inset 0 -10px 18px -10px rgba(255,255,255,.10),
+    0 10px 30px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.25)}
+#nav::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;
+  pointer-events:none;z-index:-1;
+  background:linear-gradient(155deg,rgba(255,255,255,.7),rgba(255,255,255,.12) 30%,
+    rgba(255,255,255,.04) 60%,rgba(255,255,255,.35));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude}
+#nav button{position:relative}
+#nav button[data-tab]{color:rgba(246,240,230,.82);font-size:var(--t-petit);font-weight:600;
+  text-shadow:0 1px 3px rgba(0,0,0,.6);
+  width:100%;height:100%;border-radius:999px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  transition:color .15s,background-color .2s}
+#nav button .ic svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+#nav button[aria-current="true"]{color:var(--craie);background:rgba(255,255,255,.13);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),inset 0 -1px 0 rgba(255,255,255,.06)}
+#nav-capture{width:66px;height:100%;display:flex;align-items:center;justify-content:center;
+  border-radius:999px;background:var(--craie)!important;transition:transform .12s}
+#nav-capture:active{transform:scale(.94)}
+#nav button[data-tab]:active{background:rgba(246,240,230,.16)}
+#nav-capture .declencheur{width:20px;height:20px;border-radius:50%;border:2.5px solid var(--encre)}
+#nav-capture.fait{background:rgba(255,255,255,.08)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
+#nav-capture.fait .declencheur{border-color:rgba(246,240,230,.8)}
+/* pastille « nouveau » : un carré de craie — ni rond (visages), ni couleur (personnes) */
+#nav button.pastille .ic::after{content:"";position:absolute;top:var(--e2);left:calc(50% + 8px);
+  width:8px;height:8px;background:var(--craie);border-radius:var(--r);
+  outline:2px solid var(--encre-bas)}
+@media (prefers-reduced-transparency:reduce){
+  #nav{background:var(--encre-bas);-webkit-backdrop-filter:none;backdrop-filter:none}
+  #nav button[data-tab]{text-shadow:none}
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  #nav{background:var(--encre-bas)}
+}
+
+/* Hors ligne : une ligne discrète sous la barre d'état, au-dessus de tout. */
+#hors-ligne{position:fixed;top:calc(var(--haut) + var(--e2));left:50%;transform:translateX(-50%);
+  z-index:12;background:var(--encre-haut);border:1px solid var(--trait);border-radius:var(--r2);
+  padding:var(--e1) var(--e3);font-size:var(--t-meta);color:var(--craie-faible);
+  display:flex;align-items:center;gap:var(--e2);white-space:nowrap}
+#hors-ligne svg{width:14px;height:14px}
+
+/* ===== connexion ========================================================= */
+#view-login{align-items:center;justify-content:center}
+.login-wrap{width:100%;max-width:var(--col);padding:var(--e6);text-align:center}
+.login-title{font-family:var(--disp);font-size:clamp(56px,18vw,76px);line-height:.92;
+  margin-bottom:var(--e8);letter-spacing:-.03em}
+.login-title em{font-style:normal;color:var(--encre-sam)}
+.login-title b{font-weight:inherit;color:var(--encre-alex)}
+.accounts{display:flex;gap:var(--e8);justify-content:center;margin-bottom:var(--e6)}
+.acct{display:flex;flex-direction:column;align-items:center;gap:var(--e2);
+  font-size:var(--t-corps);color:var(--craie-faible);transition:color .15s}
+.acct.sel{color:var(--craie)}
+.acct .ava{width:86px;height:86px;border-radius:50%;overflow:hidden;background:var(--encre-haut);
+  border:2px solid color-mix(in srgb,var(--encre-auteur) 40%,var(--encre));transition:border-color .15s,transform .15s}
+.acct.sel .ava{border-color:var(--encre-auteur)}
+.acct:active .ava{transform:scale(.96)}
+.acct .ava img{width:100%;height:100%;object-fit:cover;display:block}
+.acct .ava .ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  font-size:var(--t-titre);font-weight:500;color:var(--craie-faible)}
+.pin-pad{display:none;flex-direction:column;align-items:center;gap:var(--e3)}
+.pin-pad.show{display:flex}
+.pin-consigne{font-size:var(--t-meta);color:var(--craie-faible)}
+.pin-dots{display:flex;gap:var(--e3);min-height:var(--cible);align-items:center}
+.pin-dots i{width:12px;height:12px;border-radius:var(--r);border:1px solid var(--craie-faible);
+  transition:background .12s,border-color .12s,transform .12s}
+.pin-dots i.on{background:var(--craie);border-color:var(--craie);transform:scale(1.15)}
+.pin-input{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
+.err-msg{min-height:1.4em;font-size:var(--t-meta);color:var(--alerte)}
+.info-msg{font-size:var(--t-meta);color:var(--craie-faible);margin-bottom:var(--e4)}
+.login-wrap.shake{animation:shake .3s steps(3)}
+@keyframes shake{0%,100%{transform:translateX(0)}33%{transform:translateX(-6px)}66%{transform:translateX(5px)}}
+
+/* ===== journal : une journée = un diptyque ================================
+   Deux colonnes fixes, une par personne (Sam à gauche, Alex à droite).
+   L'ordre ne change JAMAIS : c'est ce qui permet de lire en diagonale. */
+#view-feed .scroll,#view-profile .scroll,#view-settings .scroll,#view-admin .scroll{
+  padding:0 var(--e4) calc(var(--navpied) + var(--e8))}
+#view-profile .scroll,#view-settings .scroll,#view-admin .scroll{padding-bottom:calc(var(--bas) + var(--e8))}
+
+.duo-tete{position:sticky;top:0;z-index:3;background:var(--encre);
+  display:grid;grid-template-columns:1fr 1fr;gap:var(--e2);
+  padding:var(--e2) 0;border-bottom:1px solid var(--trait)}
+.nom-encre{font-size:var(--t-meta);font-weight:500;display:flex;align-items:center;gap:var(--e2);min-width:0}
+.nom-encre::before{content:"";width:8px;height:8px;border-radius:var(--r);
+  background:var(--encre-auteur);flex:none}
+.p-sam{--encre-auteur:var(--encre-sam)}
+.p-alex{--encre-auteur:var(--encre-alex)}
+
+/* Intertitre : « 2 octobre · aujourd'hui » — le numéro en Fraunces. */
+.jour{display:flex;align-items:baseline;gap:var(--e2);padding:var(--e8) 0 var(--e3)}
+.jour .num{font-family:var(--disp);font-size:var(--t-jour);line-height:.9;letter-spacing:-.03em}
+.jour .mois{font-size:var(--t-fort);font-weight:500}
+.jour .quoi{font-size:var(--t-meta);color:var(--craie-faible)}
+.a-deux{width:24px;height:16px;margin-left:auto;align-self:center;fill:none;
+  stroke:var(--surimpr);stroke-width:1.8}
+
+.duo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--e2)}
+
+/* ── l'emplacement : UN composant, quatre états, deux tailles ─────────────
+   Journal (3:4) et version compacte (feuille de carte, journée déjà là).
+   Le même HTML partout (composants.js → slotHtml). */
+.slot{display:flex;flex-direction:column;min-width:0;text-align:left}
+.slot .vue{position:relative;aspect-ratio:3/4;overflow:hidden;border-radius:var(--r2);
+  background:var(--encre-haut) center/cover no-repeat;display:flex;align-items:center;justify-content:center;width:100%}
+.slot.compact .vue{aspect-ratio:auto;height:min(30vh,240px)}
+.slot img{width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none;pointer-events:none}
+.slot img.face{position:absolute;inset:0;transition:opacity .25s}
+.slot img.face.charge{opacity:0}
+.slot .dessous{margin-top:var(--e2);display:flex;flex-direction:column;gap:2px;min-height:1.3em;min-width:0}
+.slot .heure{font-size:var(--t-meta);color:var(--craie-faible);display:flex;align-items:center;gap:var(--e2)}
+.slot .mot{font-size:var(--t-corps);line-height:1.3;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.slot.compact .mot{-webkit-line-clamp:1}
+.slot .lieu{font-size:var(--t-meta);color:var(--craie-faible);display:flex;align-items:center;gap:var(--e1);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.slot .lieu span{overflow:hidden;text-overflow:ellipsis}
+.attente{font-size:var(--t-meta);color:var(--craie-faible);padding:var(--e2);text-align:center}
+/* Journée sans aucune photo : les deux places restent, repliées. */
+.duo.creuse .slot .vue{aspect-ratio:auto;height:88px}
+
+.slot.ouvert,.slot.verrou:not(.perdue),.slot.combler{cursor:pointer}
+.slot.ouvert:active .vue,.slot.verrou:not(.perdue):active .vue{transform:scale(.985)}
+.slot .vue{transition:transform .12s}
+/* L'autre prise, en incrustation : un appui l'échange — le même geste partout. */
+.incrust{position:absolute;left:var(--e2);top:var(--e2);width:32%;aspect-ratio:3/4;padding:0;z-index:1;
+  border:1.5px solid var(--encre);border-radius:var(--r2);overflow:hidden;background:var(--encre-haut)}
+.incrust img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.incrust::after{content:"";position:absolute;inset:-10px}
+.bascule-anim{animation:bascule .22s ease-out}
+@keyframes bascule{from{transform:scale(.94);opacity:.6}to{transform:none;opacity:1}}
+.slot .tag{position:absolute;right:var(--e2);bottom:var(--e2);font-size:var(--t-petit);
+  background:var(--voile-fort);padding:2px var(--e2);border-radius:var(--r);color:var(--craie)}
+
+/* Verrouillé : la vignette floutée du serveur, jamais la photo pleine. */
+.slot.verrou img{opacity:.8}
+.sceau{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;
+  font-size:var(--t-meta);font-weight:500;background:var(--voile-fort);padding:var(--e1) var(--e3);
+  border-radius:var(--r);color:var(--craie);display:flex;align-items:center;gap:var(--e1)}
+.sceau svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* Journée close : elle ne s'ouvrira plus. Visible, inerte. */
+.slot.verrou.perdue img{opacity:.35;filter:grayscale(.7)}
+.slot.verrou.perdue .sceau{color:var(--craie-faible)}
+
+/* À raconter : MA journée, encore rattrapable. La seule case qui appelle. */
+.slot.combler .vue{background:transparent;border:1.5px dashed var(--craie-faible)}
+.slot.combler .plus{color:var(--craie)}
+.slot.combler .plus svg{width:32px;height:32px;stroke-width:1.4}
+.slot.combler:active .vue{background:var(--encre-haut)}
+/* Inerte : hors fenêtre, ou place de l'autre encore vide. */
+.slot.vide .vue{background:transparent;border:1px dashed var(--craie-pale)}
+
+svg.pin{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.7;
+  vertical-align:-2px;display:inline-block;flex:none}
+
+.fil-n{display:inline-flex;align-items:center;gap:3px;font-size:var(--t-meta);color:var(--craie-faible)}
+.fil-n svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.fil-n.nonlu{color:var(--encre);background:var(--craie);padding:0 var(--e1);border-radius:var(--r)}
+
+/* écho du passé, en tête */
+.echo{padding-top:var(--e4)}
+.echo-titre{font-size:var(--t-meta);color:var(--craie-faible);margin-bottom:var(--e2)}
+.echo-vignettes{display:flex;gap:var(--e2)}
+.echo-v{width:64px;aspect-ratio:3/4;padding:0;border-radius:var(--r2);
+  background:var(--encre-haut);overflow:hidden;border:1.5px solid var(--encre-auteur)}
+.echo-v img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* tirer pour rafraîchir : les deux anneaux, qui tournent pendant la recharge */
+.tirer{height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;transition:height .2s}
+.tirer svg{width:30px;height:20px;fill:none;stroke-width:1.8;opacity:.4;transition:opacity .15s}
+.tirer.pret svg{opacity:1}
+.tirer.charge{height:44px}
+.tirer.charge svg{opacity:1;animation:tourne 1s linear infinite}
+@keyframes tourne{to{transform:rotate(360deg)}}
+.anneaux .a1{stroke:var(--encre-sam)}
+.anneaux .a2{stroke:var(--encre-alex)}
+
+.suite{height:1px}
+.load-more{margin:var(--e8) auto;display:flex}
+
+/* squelettes : la forme de ce qui arrive, sans texte « chargement » */
+.squelette{background:var(--encre-haut);border-radius:var(--r2);animation:respire 1.4s ease-in-out infinite alternate}
+@keyframes respire{from{opacity:.55}to{opacity:1}}
+.sq-jour{height:22px;width:40%;margin:var(--e8) 0 var(--e3)}
+.sq-photo{aspect-ratio:3/4}
+.sq-ligne{height:12px;margin-top:var(--e2);width:60%}
+.sq-sceau{width:68px;height:68px;border-radius:50%;margin:0 auto}
+
+/* ===== état vide / erreur : un seul gabarit ============================== */
+.etat{text-align:center;color:var(--craie-faible);padding:var(--e12) var(--e6);
+  line-height:1.5;max-width:34ch;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:var(--e3)}
+.etat .anneaux{width:48px;height:32px;fill:none;stroke-width:1.8}
+.etat-titre{font-size:var(--t-grand);font-weight:600;color:var(--craie);line-height:1.2}
+.etat.erreur .etat-titre{color:var(--craie)}
+.etat .btn{margin-top:var(--e2)}
+.etat-carte{background:var(--encre);border:1px solid var(--trait);border-radius:var(--r2);padding:var(--e2)}
+
+/* ===== feuilles ==========================================================
+   Feuille de carte : monte du bas, la carte reste manipulable au-dessus.
+   Feuille d'info / dialogue : monte du bas sur un voile, se range au voile
+   ou en glissant vers le bas. */
+#feuille{position:fixed;left:0;right:0;bottom:0;z-index:5;max-width:var(--col);margin:0 auto;
+  background:var(--encre);border-top:1px solid var(--trait);border-radius:var(--r2) var(--r2) 0 0;
+  padding:0 var(--e4) calc(var(--navpied) + var(--e3));transform:translateY(100%);transition:transform .25s ease-out}
+#feuille.show{transform:none}
+.poignee{width:36px;height:4px;border-radius:var(--r);background:var(--craie-pale);margin:var(--e2) auto var(--e3)}
+.f-tete{margin-bottom:var(--e3)}
+.f-date{font-size:var(--t-fort);font-weight:600}
+.f-lieu{font-size:var(--t-meta);color:var(--craie-faible);margin-top:2px}
+.f-pied{margin-top:var(--e3)}
+.f-pied .btn{width:100%}
+
+.voile-feuille{position:fixed;inset:0;z-index:15;background:rgba(0,0,0,.5);
+  display:flex;align-items:flex-end;justify-content:center;animation:fondu .18s ease-out}
+.voile-feuille.part{animation:fonduSort .18s ease-in forwards}
+@keyframes fondu{from{opacity:0}to{opacity:1}}
+@keyframes fonduSort{to{opacity:0}}
+.feuille-info{width:100%;max-width:var(--col);background:var(--encre);border-top:1px solid var(--trait);
+  border-radius:var(--r2) var(--r2) 0 0;padding:0 var(--e4) calc(var(--bas) + var(--e4));
+  animation:monteFeuille .22s ease-out;transition:transform .2s}
+.voile-feuille.part .feuille-info{transform:translateY(100%)}
+@keyframes monteFeuille{from{transform:translateY(100%)}to{transform:none}}
+.fi-corps{display:flex;flex-direction:column;align-items:center;text-align:center;gap:var(--e2);padding:var(--e2) 0 var(--e4)}
+.fi-titre{font-size:var(--t-grand);font-weight:600;line-height:1.2}
+.fi-texte{color:var(--craie-faible);line-height:1.5;max-width:34ch}
+.fi-meta{font-size:var(--t-meta);color:var(--craie-faible)}
+.fi-visuel{margin-bottom:var(--e2)}
+.fi-visuel svg{width:120px;height:120px;display:block}
+.fi-vignette{width:120px;aspect-ratio:3/4;border-radius:var(--r2);overflow:hidden;background:var(--encre-haut)}
+.fi-vignette img{width:100%;height:100%;object-fit:cover;display:block;opacity:.8}
+.fi-actions{display:flex;flex-direction:column;gap:var(--e2)}
+.fi-actions .btn{width:100%}
+
+/* ===== profil ============================================================ */
+.profil-tete{display:flex;align-items:center;gap:var(--e4);padding:var(--e6) 0 var(--e3)}
+.profil-ava{width:72px;height:72px;border-radius:50%;flex:none;position:relative;
+  background:var(--encre-haut);border:2px solid var(--encre-auteur)}
+.profil-ava .rond{width:100%;height:100%;border-radius:50%;overflow:hidden;display:block}
+.profil-ava img{width:100%;height:100%;object-fit:cover;display:block}
+.profil-ava .ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  font-size:var(--t-titre);font-weight:500;color:var(--craie-faible)}
+.profil-ava input{display:none}
+label.profil-ava{cursor:pointer}
+/* le crayon : on peut changer sa photo */
+.profil-ava .crayon{position:absolute;right:-4px;bottom:-4px;width:26px;height:26px;border-radius:var(--r2);
+  background:var(--craie);color:var(--encre);display:flex;align-items:center;justify-content:center;
+  outline:2px solid var(--encre)}
+.profil-ava .crayon svg{width:14px;height:14px;stroke-width:2}
+.profil-nom{font-size:var(--t-grand);font-weight:600;line-height:1.1}
+.profil-bio{font-size:var(--t-corps);color:var(--craie-faible);margin-top:var(--e1);line-height:1.4}
+.compteurs{font-size:var(--t-corps);color:var(--craie-faible);line-height:1.6}
+.compteurs b{color:var(--craie);font-weight:600}
+.section{font-size:var(--t-fort);font-weight:600;margin:var(--e8) 0 var(--e1);
+  display:flex;justify-content:space-between;align-items:baseline}
+.section span{font-size:var(--t-meta);font-weight:400;color:var(--craie-faible)}
+.sous-section{font-size:var(--t-meta);color:var(--craie-faible);margin:var(--e4) 0 var(--e3)}
+
+/* Sam | Alex : un sélecteur segmenté, neutre, dans l'ordre fixe */
+.bascule{display:flex;margin-top:var(--e2);background:var(--encre-haut);border-radius:var(--r2);
+  padding:3px;width:max-content}
+.bascule button{min-height:var(--h-btn-petit);padding:0 var(--e4);font-size:var(--t-meta);
+  font-weight:500;color:var(--craie-faible);border-radius:var(--r);display:flex;align-items:center;gap:var(--e2)}
+.bascule button::before{content:"";width:8px;height:8px;border-radius:var(--r);background:var(--encre-auteur)}
+.bascule button[aria-pressed="true"]{background:var(--trait);color:var(--craie)}
+
+/* médailles : une grille de sceaux. Obtenue = encre pleine, à gagner = filet
+   et un arc d'avancement autour. */
+.medailles{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:var(--e4) var(--e2)}
+.medaille{display:flex;flex-direction:column;align-items:center;gap:var(--e2);text-align:center;
+  padding:var(--e1);border-radius:var(--r2)}
+.medaille:active{background:var(--encre-haut)}
+.medaille svg{width:68px;height:68px;display:block}
+.medaille .t{font-size:var(--t-meta);line-height:1.25}
+.medaille .a{font-size:var(--t-petit);color:var(--craie-faible)}
+.medaille.non .t{color:var(--craie-faible)}
+
+/* ===== réglages ========================================================== */
+.reglage{background:var(--encre-haut);border-radius:var(--r2);padding:var(--e4);margin-top:var(--e3)}
+.reglage-titre{font-weight:600;margin-bottom:var(--e2)}
+.reglage.liens{padding:0;overflow:hidden}
+.ligne{display:flex;justify-content:space-between;align-items:center;width:100%;
+  min-height:var(--h-btn);padding:0 var(--e4);text-align:left}
+.ligne:active{background:var(--trait)}
+.ligne + .ligne{border-top:1px solid var(--trait)}
+.ligne .ic{color:var(--craie-faible)}
+.ligne.danger{color:var(--alerte)}
+.notif-texte{font-size:var(--t-meta);color:var(--craie-faible);line-height:1.5;margin-bottom:var(--e3)}
+.champ{display:flex;flex-direction:column;gap:var(--e2);margin-bottom:var(--e3)}
+.champ label{font-size:var(--t-meta);color:var(--craie-faible)}
+.champ input,.champ textarea,.saisie{background:var(--encre);border:1px solid var(--trait);
+  border-radius:var(--r2);min-height:var(--h-champ);padding:var(--e2) var(--e3);font-size:var(--t-saisie);resize:none;
+  user-select:text;-webkit-user-select:text}
+.champ input:focus,.champ textarea:focus,.saisie:focus{border-color:var(--craie-faible)}
+.reglage .btn{width:100%}
+
+/* ===== capture =========================================================== */
+#view-capture{background:#000}
+#cam-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#cam-video.mirror{transform:scaleX(-1)}
+.cam-topbar{position:absolute;top:calc(var(--haut) + var(--e3));left:0;right:0;z-index:2;
+  display:flex;justify-content:space-between;align-items:center;padding:0 var(--e4);gap:var(--e2)}
+.cam-jour{font-size:var(--t-meta);font-weight:500;background:var(--voile);border:1px solid var(--craie-faible);
+  padding:var(--e1) var(--e3);border-radius:var(--r2);min-height:32px;display:flex;align-items:center}
+.cam-controls{position:absolute;bottom:calc(var(--bas) + var(--e8));left:0;right:0;z-index:2;
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 var(--e8)}
+.cam-flip{justify-self:start;display:flex;flex-direction:column;align-items:center;gap:var(--e1);
+  font-size:var(--t-petit);font-weight:500;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.cam-flip .rond{width:46px;height:46px;border-radius:var(--r2);background:var(--voile);
+  display:flex;align-items:center;justify-content:center}
+.cam-flip:active .rond{background:var(--voile-fort)}
+.cam-equilibre{justify-self:end;width:46px}
+#cam-shutter{width:74px;height:74px;border-radius:50%;background:var(--craie);
+  border:4px solid rgba(246,240,230,.35);transition:transform .1s,opacity .15s}
+#cam-shutter:active{transform:scale(.93)}
+#cam-shutter[aria-disabled="true"]{opacity:.3}
+.cam-status{position:absolute;bottom:calc(var(--bas) + 132px);left:0;right:0;text-align:center;
+  z-index:2;font-size:var(--t-meta);padding:0 var(--e6)}
+.cam-status span{background:var(--voile);padding:var(--e2) var(--e3);border-radius:var(--r2);display:inline-block}
+.geo-status{color:var(--craie-faible)}
+.geo-status.ok span{color:var(--craie)}
+.geo-status.ko span{color:var(--craie);border:1px solid var(--alerte);cursor:pointer}
+.geo-status.secoue span{animation:shake .3s steps(3)}
+#cam-flash{position:absolute;inset:0;background:var(--craie);opacity:0;pointer-events:none;z-index:3}
+#cam-flash.on{animation:flash .35s ease-out}
+@keyframes flash{0%{opacity:.8}100%{opacity:0}}
+.cam-step{position:absolute;inset:0;z-index:3;background:rgba(13,10,8,.3);opacity:0;
+  pointer-events:none;transition:opacity .12s}
+.cam-step.on{opacity:1}
+.cam-step.on::after{content:"";position:absolute;top:50%;left:50%;width:56px;height:56px;
+  margin:-28px 0 0 -28px;border:2px solid var(--craie);border-radius:50%;
+  animation:rebours 1s linear forwards}
+@keyframes rebours{from{transform:scale(1);opacity:1}to{transform:scale(.2);opacity:.15}}
+
+/* Panneaux opaques au-dessus de la caméra : journée déjà là, accès refusé. */
+.cam-panneau{position:absolute;inset:0;z-index:5;background:var(--encre);
+  display:flex;flex-direction:column}
+.cam-panneau .corps{flex:1;display:flex;align-items:center;justify-content:center;padding:var(--e6);overflow-y:auto}
+.bloc-carte{width:100%;max-width:360px;text-align:center}
+.bloc-titre{font-size:var(--t-grand);font-weight:600;margin-bottom:var(--e4)}
+.bloc-duo{text-align:left;margin-bottom:var(--e3)}
+.bloc-reste{font-size:var(--t-meta);color:var(--craie-faible);margin-bottom:var(--e6)}
+.bloc-actions{display:flex;flex-direction:column;gap:var(--e2)}
+.etapes{text-align:left;color:var(--craie-faible);line-height:1.6;margin:var(--e3) 0 var(--e6);padding-left:1.2em}
+.etapes b{color:var(--craie);font-weight:500}
+
+/* ===== révision ========================================================== */
+#view-review .scroll{padding:var(--e2) var(--e4) calc(var(--bas) + var(--e6));
+  display:flex;flex-direction:column;align-items:center;width:100%}
+.review-stage{position:relative;width:100%;max-width:var(--col)}
+.review-stage img.primary{width:100%;aspect-ratio:3/4;max-height:56vh;object-fit:cover;display:block;
+  border-radius:var(--r2)}
+.astuce{font-size:var(--t-meta);color:var(--craie-faible);margin-top:var(--e2);width:100%;max-width:var(--col)}
+.caption-input{width:100%;max-width:var(--col);margin-top:var(--e3);background:var(--encre-haut);
+  border:1px solid var(--trait);border-radius:var(--r2);padding:var(--e3);
+  font-size:var(--t-saisie);resize:none;min-height:56px;line-height:1.35;user-select:text;-webkit-user-select:text}
+.caption-input::placeholder,.fil-saisie textarea::placeholder{color:var(--craie-faible)}
+.caption-input:focus{border-color:var(--craie-faible)}
+.review-geo{margin-top:var(--e3);font-size:var(--t-meta);color:var(--craie-faible);
+  display:flex;align-items:center;gap:var(--e2);width:100%;max-width:var(--col)}
+.review-actions{display:flex;gap:var(--e3);margin-top:var(--e4);width:100%;max-width:var(--col)}
+.review-actions .btn{flex:1}
+.review-actions .btn-plein{flex:2}
+.envoi{width:100%;max-width:var(--col);height:3px;background:var(--trait);border-radius:var(--r);
+  margin-top:var(--e3);overflow:hidden}
+.envoi i{display:block;height:100%;width:0;background:var(--craie);transition:width .2s}
+
+/* ===== boutons ===========================================================
+   Hiérarchie : plein (une action principale par écran) · filet · texte.
+   Le même verbe a toujours la même forme. */
+.btn{font-weight:500;font-size:var(--t-corps);border-radius:var(--r2);min-height:var(--h-btn);
+  padding:0 var(--e6);display:inline-flex;align-items:center;justify-content:center;gap:var(--e2);
+  transition:transform .1s,opacity .1s}
+.btn:active{transform:scale(.98)}
+.btn-plein{background:var(--craie);color:var(--encre)}
+.btn-ghost{background:transparent;color:var(--craie);border:1px solid var(--trait)}
+.btn-danger{background:var(--alerte);color:var(--craie)}
+.btn-ghost.alerte{color:var(--alerte)}
+.btn-petit{min-height:var(--h-btn-petit);padding:0 var(--e4)}
+.btn:disabled{opacity:.35;cursor:default;transform:none}
+.btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* lien : texte en petit, mais une zone de toucher de 44 px */
+.lien{min-height:var(--cible);padding:0;font-size:var(--t-meta);color:var(--craie-faible);
+  display:inline-flex;align-items:center;gap:var(--e1)}
+.lien:active{color:var(--craie)}
+.lien.danger{color:var(--alerte)}
+
+/* ===== admin ============================================================= */
+.admin-sec{font-size:var(--t-fort);font-weight:600;margin:var(--e6) 0 var(--e3)}
+.admin-post{display:flex;gap:var(--e3);align-items:center;padding:var(--e2);margin-bottom:var(--e2);
+  background:var(--encre-haut);border-radius:var(--r2)}
+.admin-post img,.admin-post .lockbox{width:48px;height:48px;object-fit:cover;flex:none;border-radius:var(--r)}
+.admin-post .lockbox{background:var(--encre);border:1px dashed var(--craie-pale)}
+.admin-post .grow{flex:1;font-size:var(--t-meta);line-height:1.45;min-width:0}
+.admin-post .grow small{color:var(--craie-faible);font-size:var(--t-meta)}
+.admin-post .ico-btn{color:var(--alerte);flex:none}
+.purge-form{padding:var(--e4);background:var(--encre-haut);border-radius:var(--r2)}
+.purge-label{display:block;font-size:var(--t-meta);color:var(--craie-faible);margin-bottom:var(--e2)}
+.purge-ligne{display:flex;align-items:center;gap:var(--e3);margin-bottom:var(--e3)}
+.purge-ligne input{width:96px;text-align:center}
+.purge-actions{display:flex;gap:var(--e2)}
+.purge-actions .btn{flex:1}
+#purge-result{font-size:var(--t-meta);color:var(--craie-faible);margin:var(--e3) 0 var(--e1);line-height:1.5}
+
+/* ===== toast =============================================================
+   Le retour d'une action — pas une explication. Une action « Annuler »
+   quand c'est réversible ; une erreur porte son icône. */
+#toast{position:fixed;left:50%;bottom:calc(var(--navpied) + 76px);
+  transform:translateX(-50%);z-index:30;background:var(--craie);color:var(--encre);
+  padding:0 var(--e2) 0 var(--e4);min-height:var(--cible);border-radius:var(--r2);font-size:var(--t-meta);font-weight:500;
+  opacity:0;pointer-events:none;transition:opacity .18s;width:max-content;max-width:min(88vw,var(--col));
+  display:flex;align-items:center;gap:var(--e3)}
+body.sans-nav #toast{bottom:calc(var(--bas) + var(--e8))}
+#toast.show{opacity:1;pointer-events:auto}
+#toast .t-texte{padding:var(--e2) 0}
+#toast:not(:has(.t-action)){padding-right:var(--e4)}
+#toast .t-action{min-height:var(--cible);padding:0 var(--e2);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+#toast.erreur{background:var(--encre-haut);color:var(--craie);border:1px solid var(--alerte)}
+#toast .t-ic{display:flex;color:var(--alerte)}
+#toast .t-ic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ===== fiche d'un souvenir ===============================================
+   Plein écran OPAQUE, photo bord à bord : ✕ à gauche (comme tout modal),
+   enregistrer à droite. On la ferme aussi en la glissant vers le bas. */
+#post-detail{position:fixed;inset:0;z-index:8;display:none;background:var(--encre);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;padding-top:var(--haut);
+  padding-bottom:calc(var(--bas) + var(--e6));transition:transform .25s ease-out}
+#post-detail.show{display:block;animation:monte .25s ease-out}
+@keyframes monte{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.detail-card{position:relative;width:100%;max-width:520px;margin:0 auto}
+.detail-coins{position:absolute;top:var(--e3);left:var(--e3);right:var(--e3);z-index:2;
+  display:flex;justify-content:space-between;pointer-events:none}
+.detail-coins>*{pointer-events:auto}
+.detail-stage{position:relative}
+.detail-stage img.primary{width:100%;aspect-ratio:3/4;max-height:68vh;object-fit:cover;display:block}
+.detail-stage .incrust{top:calc(var(--e3) + 52px);left:var(--e3);width:28%}
+.detail-meta{padding:var(--e3) var(--e4) 0}
+.detail-sub{font-size:var(--t-meta);color:var(--craie-faible);line-height:1.5}
+.detail-sub .who{color:var(--encre-auteur);font-weight:600}
+.detail-lieu{display:flex;align-items:center;gap:var(--e1)}
+.detail-legende{display:flex;flex-direction:column;align-items:flex-start;gap:var(--e1);margin-top:var(--e2)}
+.detail-cap{font-size:var(--t-fort);font-weight:500;line-height:1.35;word-break:break-word}
+.cap-edit{width:100%}
+.cap-actions{display:flex;justify-content:flex-end;align-items:center;gap:var(--e4);width:100%}
+
+/* ===== le fil de mots : une messagerie =================================
+   Mes mots à droite, ceux de l'autre à gauche avec son visage. Chaque bulle
+   est TEINTÉE de l'encre de son auteur : la couleur dit qui parle (la règle
+   de la charte), sans nom répété. Les deux rayons de la charte suffisent à
+   dessiner une bulle : 6 px partout, 2 px au coin qui « pointe » vers son
+   auteur, en fin de groupe. La saisie reste collée en bas de la fiche. */
+.fil{margin:var(--e6) var(--e4) 0;border-top:1px solid var(--trait);padding-top:var(--e4)}
+.fil-titre{font-size:var(--t-fort);font-weight:600;display:flex;align-items:baseline;gap:var(--e2);margin-bottom:var(--e2)}
+.fil-compte{font-size:var(--t-meta);font-weight:400;color:var(--craie-faible)}
+.fil-vide{font-size:var(--t-meta);color:var(--craie-faible);padding:var(--e6) 0;text-align:center;line-height:1.5}
+.fil-sep{text-align:center;font-size:var(--t-petit);color:var(--craie-faible);margin:var(--e4) 0 var(--e2)}
+
+.msg{display:flex;align-items:flex-end;gap:var(--e2);margin-top:2px}
+.msg.seul,.msg.debut{margin-top:var(--e3)}
+.fil-sep + .msg{margin-top:0}
+.msg.moi{justify-content:flex-end}
+.msg-corps{display:flex;flex-direction:column;max-width:78%;min-width:0}
+.msg.moi .msg-corps{align-items:flex-end}
+.bulle{padding:var(--e2) var(--e3);border-radius:var(--r2);font-size:var(--t-corps);line-height:1.38;
+  white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text;
+  background:color-mix(in srgb,var(--encre-auteur) 10%,var(--encre-haut));color:var(--craie);
+  border:1px solid color-mix(in srgb,var(--encre-auteur) 42%,transparent)}
+.msg.moi .bulle{background:color-mix(in srgb,var(--encre-auteur) 14%,var(--encre-haut));cursor:pointer}
+/* le coin qui pointe vers l'auteur, sur la dernière bulle du groupe */
+.msg.autre.seul .bulle,.msg.autre.fin .bulle{border-bottom-left-radius:var(--r)}
+.msg.moi.seul .bulle,.msg.moi.fin .bulle{border-bottom-right-radius:var(--r)}
+.msg.autre.debut .bulle,.msg.autre.milieu .bulle{border-bottom-left-radius:var(--r)}
+.msg.autre.milieu .bulle,.msg.autre.fin .bulle{border-top-left-radius:var(--r)}
+.msg.moi.debut .bulle,.msg.moi.milieu .bulle{border-bottom-right-radius:var(--r)}
+.msg.moi.milieu .bulle,.msg.moi.fin .bulle{border-top-right-radius:var(--r)}
+.msg-info{font-size:var(--t-petit);color:var(--craie-faible);margin-top:var(--e1);padding:0 var(--e1)}
+.msg .lien{display:none;min-height:var(--cible);color:var(--alerte)}
+.msg.choisi .lien{display:inline-flex}
+.msg.choisi .bulle{outline:1.5px solid var(--craie-faible);outline-offset:1px}
+.msg.envoi-en-cours .bulle{opacity:.55}
+
+/* un visage : la photo, sinon l'initiale sur l'encre de la personne */
+.visage{width:28px;height:28px;border-radius:50%;flex:none;overflow:hidden;display:flex;align-items:center;
+  justify-content:center;background:var(--encre-auteur);color:var(--encre);font-size:var(--t-meta);font-weight:600}
+.visage img{width:100%;height:100%;object-fit:cover;display:block}
+.visage.vide{background:none}
+
+/* la saisie, collée en bas de la fiche, comme dans une messagerie */
+.fil-saisie{position:sticky;bottom:0;z-index:3;display:flex;align-items:flex-end;gap:var(--e2);
+  margin-top:var(--e4);padding:var(--e2) var(--e4) calc(var(--bas) + var(--e6));background:var(--encre);border-top:1px solid var(--trait)}
+.fil-saisie textarea{flex:1;max-height:120px;line-height:1.3;background:var(--encre-haut)}
+.fil-saisie textarea::placeholder{color:var(--craie-faible)}
+.envoyer{width:var(--h-champ);height:var(--h-champ);flex:none;border-radius:var(--r2);background:var(--craie);color:var(--encre);
+  display:flex;align-items:center;justify-content:center;transition:opacity .15s,transform .1s}
+.envoyer svg{stroke-width:2.2}
+.envoyer:active{transform:scale(.94)}
+.envoyer:disabled{opacity:.25}
+#post-detail{padding-bottom:0}
+
+/* ===== recadrage de la photo de profil =================================== */
+.recadrage{position:fixed;inset:0;z-index:40;background:var(--encre);display:flex;flex-direction:column}
+.rc-zone{flex:1;display:flex;align-items:center;justify-content:center;padding:var(--e4);min-height:0}
+.rc-scene{position:relative;width:min(100%,var(--col),calc(100vh - 300px));aspect-ratio:1;touch-action:none;
+  overflow:hidden;border-radius:var(--r2);cursor:grab}
+.rc-scene canvas{display:block;width:100%;height:100%}
+/* le voile, percé d'un rond : ce qui est dedans est gardé */
+.rc-rond{position:absolute;inset:0;border-radius:50%;pointer-events:none;
+  box-shadow:0 0 0 999px rgba(13,10,8,.62);outline:1.5px solid rgba(246,240,230,.85);outline-offset:-1px}
+.rc-pied{padding:0 var(--e6) calc(var(--bas) + var(--e6));display:flex;flex-direction:column;align-items:center;gap:var(--e3)}
+.rc-pied .btn{width:100%;max-width:var(--col)}
+
+/* ===== moments plein écran : fête, publication, accueil ================== */
+.fete,.moment,.accueil{position:fixed;inset:0;z-index:20;background:var(--encre);display:flex;
+  align-items:center;justify-content:center;padding:var(--e6)}
+.fete-carte{text-align:center;max-width:300px;display:flex;flex-direction:column;
+  align-items:center;gap:var(--e3)}
+.fete-sur{font-size:var(--t-meta);color:var(--craie-faible)}
+.fete-sceau svg{width:150px;height:150px;display:block;animation:tampon .55s cubic-bezier(.2,.9,.3,1.3) both}
+.fete-titre{font-size:var(--t-grand);font-weight:600;line-height:1.15}
+.fete-desc{color:var(--craie-faible);line-height:1.5}
+.fete-carte .btn{margin-top:var(--e3);min-width:180px}
+@keyframes tampon{
+  0%{transform:scale(1.9) rotate(-14deg);opacity:0}
+  60%{transform:scale(.94) rotate(3deg);opacity:1}
+  100%{transform:scale(1) rotate(0)}}
+
+/* Publication : les deux anneaux se rapprochent ; ils se croisent si
+   l'autre avait déjà raconté sa journée. */
+.moment{flex-direction:column;gap:var(--e4);text-align:center;animation:fondu .2s ease-out}
+.moment.part{animation:fonduSort .3s ease-in forwards}
+.moment svg{width:140px;height:90px;fill:none;stroke-width:3}
+.moment .m1{animation:versDroite .6s cubic-bezier(.3,.8,.3,1) both}
+.moment .m2{animation:versGauche .6s cubic-bezier(.3,.8,.3,1) both}
+.moment.seul .m1{animation-name:versDroiteSeul}
+.moment.seul .m2{opacity:.25;animation-name:versGaucheSeul}
+@keyframes versDroite{from{transform:translateX(-26px)}to{transform:none}}
+@keyframes versGauche{from{transform:translateX(26px)}to{transform:none}}
+@keyframes versDroiteSeul{from{transform:translateX(-26px)}to{transform:translateX(-8px)}}
+@keyframes versGaucheSeul{from{transform:translateX(26px)}to{transform:translateX(8px)}}
+.moment .m-titre{font-size:var(--t-grand);font-weight:600}
+.moment .m-texte{color:var(--craie-faible)}
+
+.accueil{flex-direction:column;justify-content:space-between;padding:calc(var(--haut) + var(--e8)) var(--e6) calc(var(--bas) + var(--e6))}
+.ac-page{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:var(--e4);max-width:32ch;animation:fondu .25s ease-out}
+.ac-page svg{width:150px;height:110px;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.ac-titre{font-size:var(--t-grand);font-weight:600;line-height:1.2}
+.ac-texte{color:var(--craie-faible);line-height:1.5}
+.ac-points{display:flex;gap:var(--e2);justify-content:center;margin-bottom:var(--e4)}
+.ac-points i{width:8px;height:8px;border-radius:var(--r);background:var(--trait)}
+.ac-points i.on{background:var(--craie)}
+.accueil .btn{width:100%;max-width:var(--col)}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

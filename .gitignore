@@ -1,0 +1,11 @@
+# Données : base SQLite et photos personnelles — jamais dans le dépôt
+data/*
+!data/.gitkeep
+# Secrets
+.env
+*.env
+!.env.example
+# Divers
+__pycache__/
+*.pyc
+node_modules/

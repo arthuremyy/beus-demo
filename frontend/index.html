@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#14100d">
+<meta name="format-detection" content="telephone=no">
+<title>BeUs</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='42' cy='50' r='30' fill='none' stroke='%23ff4d9d' stroke-width='8'/%3E%3Ccircle cx='58' cy='50' r='30' fill='none' stroke='%23ffd23f' stroke-width='8'/%3E%3C/svg%3E">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- PAS black-translucent : iOS 26 affiche alors la page sous la barre d'état
+     mais lui compte une hauteur amputée d'autant — tout ce qui est calé en
+     bas (barre, bandeau) flottait ~60 pt au-dessus du bord de l'écran. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="BeUs">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Fraunces pour le display (un serif qui a du caractère sans être mièvre),
+     Archivo pour l'interface (grotesque neutre, lisible en petit). -->
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@6.10.0/dist/maplibre-gl.css" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+
+<div id="fallback"></div>
+<div id="map"></div>
+
+<div id="app">
+
+  <!-- connexion -->
+  <section class="view" id="view-login">
+    <div class="login-wrap">
+      <!-- Les deux encres dès le titre : rose pour Sam, or pour Alex — dans
+           l'ordre des colonnes du journal (Sam à gauche). -->
+      <div class="login-title"><em>Be</em><b>Us</b></div>
+      <div class="info-msg" id="login-info" hidden></div>
+      <div class="accounts"></div>
+      <div class="pin-pad">
+        <div class="pin-consigne" id="pin-consigne">Ton code</div>
+        <div class="pin-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <input class="pin-input" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="6" aria-labelledby="pin-consigne">
+        <div class="err-msg" role="alert"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- carte -->
+  <section class="view" id="view-map">
+    <div class="map-coins">
+      <button class="ico-btn" id="map-fit" aria-label="Recentrer sur nos souvenirs" hidden></button>
+      <button class="moi-btn" data-moi aria-label="Nous"></button>
+    </div>
+    <div id="map-erreur" hidden></div>
+  </section>
+
+  <!-- journal -->
+  <section class="view" id="view-feed">
+    <div class="topbar">
+      <div><h1 class="titre">Journal</h1><div class="sous-titre" id="feed-sous"></div></div>
+      <button class="moi-btn" data-moi aria-label="Nous"></button>
+    </div>
+    <div class="scroll"></div>
+  </section>
+
+  <!-- profil (poussé depuis l'avatar) -->
+  <section class="view" id="view-profile">
+    <div class="barre">
+      <button class="ico-btn" data-retour aria-label="Retour"></button>
+      <h1 class="titre">Nous</h1>
+      <button class="ico-btn" id="vers-reglages" aria-label="Réglages"></button>
+    </div>
+    <div class="scroll"></div>
+  </section>
+
+  <!-- réglages (poussé depuis Nous) -->
+  <section class="view" id="view-settings">
+    <div class="barre">
+      <button class="ico-btn" data-retour aria-label="Retour"></button>
+      <h1 class="titre">Réglages</h1>
+      <span class="barre-vide"></span>
+    </div>
+    <div class="scroll"></div>
+  </section>
+
+  <!-- capture -->
+  <section class="view" id="view-capture">
+    <video id="cam-video" playsinline muted autoplay></video>
+    <div id="cam-flash"></div>
+    <div id="cam-step" class="cam-step"></div>
+    <div class="cam-topbar">
+      <button class="ico-btn sur-image" id="cam-close" aria-label="Fermer"></button>
+      <span class="cam-jour" id="cam-jour" hidden></span>
+      <span class="barre-vide"></span>
+    </div>
+    <div class="cam-status geo-status" id="cam-geo" role="status"><span>Recherche de la position…</span></div>
+    <!-- Journée déjà racontée : on ne démarre même pas la caméra. -->
+    <div id="cam-bloc" class="cam-panneau" hidden>
+      <div class="barre">
+        <button class="ico-btn" id="bloc-fermer" aria-label="Fermer"></button>
+        <span></span><span class="barre-vide"></span>
+      </div>
+      <div class="corps"><div class="bloc-carte">
+        <div class="bloc-titre">Ta journée est racontée</div>
+        <div class="duo bloc-duo" id="bloc-duo"></div>
+        <div class="bloc-reste" id="bloc-reste"></div>
+        <div class="bloc-actions">
+          <button class="btn btn-plein" id="bloc-retour">Voir le journal</button>
+          <button class="btn btn-ghost" id="bloc-hier" hidden>Raconter hier</button>
+        </div>
+      </div></div>
+    </div>
+    <!-- Caméra refusée ou absente : un panneau qui dit quoi faire. -->
+    <div id="cam-refus" class="cam-panneau" hidden>
+      <div class="barre">
+        <button class="ico-btn" id="refus-fermer" aria-label="Fermer"></button>
+        <span></span><span class="barre-vide"></span>
+      </div>
+      <div class="corps"><div class="bloc-carte">
+        <div class="bloc-titre">BeUs n’a pas accès à la caméra</div>
+        <ol class="etapes">
+          <li>Ouvre <b>Réglages</b> sur l’iPhone</li>
+          <li>Va dans <b>Safari › Caméra</b></li>
+          <li>Choisis <b>Autoriser</b>, puis reviens ici</li>
+        </ol>
+        <div class="bloc-actions">
+          <button class="btn btn-plein" id="refus-reessayer">Réessayer</button>
+        </div>
+      </div></div>
+    </div>
+    <div class="cam-controls">
+      <button id="cam-flip" class="cam-flip" aria-label="Changer de caméra">
+        <span class="rond"></span><span id="cam-facing">Arrière</span>
+      </button>
+      <button id="cam-shutter" aria-label="Prendre les deux photos" aria-disabled="true"></button>
+      <span class="cam-equilibre"></span>
+    </div>
+  </section>
+
+  <!-- révision (modal : ✕ à gauche) -->
+  <section class="view" id="view-review">
+    <div class="barre">
+      <button class="ico-btn" id="review-fermer" aria-label="Annuler"></button>
+      <h1 class="titre" id="review-titre">Ta journée</h1>
+      <span class="barre-vide"></span>
+    </div>
+    <div class="scroll">
+      <div class="empty-hint" hidden></div>
+      <div class="review-stage"></div>
+      <div class="astuce" hidden>Touche la petite photo pour inverser les deux prises.</div>
+      <div class="review-geo" hidden></div>
+      <textarea class="caption-input" placeholder="Une légende…" maxlength="280" aria-label="Légende" hidden></textarea>
+      <div class="review-actions" hidden>
+        <button class="btn btn-ghost" id="review-discard">Refaire</button>
+        <button class="btn btn-plein" id="review-publish">Raconter ma journée</button>
+      </div>
+      <div class="envoi" hidden><i></i></div>
+    </div>
+  </section>
+
+  <!-- admin (poussé depuis Réglages) -->
+  <section class="view" id="view-admin">
+    <div class="barre">
+      <button class="ico-btn" data-retour aria-label="Retour"></button>
+      <h1 class="titre">Admin</h1>
+      <span class="barre-vide"></span>
+    </div>
+    <div class="scroll">
+      <h2 class="admin-sec">Purge</h2>
+      <div class="purge-form">
+        <label class="purge-label" for="purge-days">Supprimer les souvenirs de plus de</label>
+        <div class="purge-ligne">
+          <input class="saisie" type="number" id="purge-days" min="1" inputmode="numeric"><span>jours</span>
+        </div>
+        <div class="purge-actions">
+          <button class="btn btn-ghost" id="purge-preview">Aperçu</button>
+          <button class="btn btn-danger" id="purge-confirm" hidden>Supprimer</button>
+        </div>
+      </div>
+      <div id="purge-result" role="status"></div>
+      <h2 class="admin-sec">Tous les souvenirs</h2>
+      <div class="post-list"></div>
+    </div>
+  </section>
+
+</div>
+
+<div id="map-hud" hidden><button class="hud" type="button"></button></div>
+<!-- Trois entrées, dont une action au centre : la capture. Profil, réglages,
+     admin et déconnexion vivent derrière l'avatar (en haut à droite). -->
+<nav id="nav" hidden>
+  <button data-tab="map" aria-current="true"><span class="ic" data-ic="carte"></span>Carte</button>
+  <button id="nav-capture" aria-label="Raconter ma journée"><span class="declencheur"></span></button>
+  <button data-tab="feed"><span class="ic" data-ic="journal"></span>Journal</button>
+</nav>
+
+<div id="hors-ligne" role="status" hidden></div>
+<div id="feuille" hidden></div>
+<div id="post-detail"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="/assets/js/main.js"></script>
+</body>
+</html>
